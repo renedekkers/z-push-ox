@@ -140,9 +140,46 @@ class BackendOX extends BackendDiff {
       }
     }
 
+    $folder_list = $this -> FilterContactFolders($folder_list);
+
     ZLog::Write(LOGLEVEL_DEBUG, 'BackendOX::GetFolderList() - folder_list: ' . print_r($folder_list, true));
 
     return $folder_list;
+  }
+
+  private function FilterContactFolders($folder_list) {
+    // Get the personal contacts folder
+    $data = $this -> GetOXUserConfig('folder/contacts');
+    if (!array_key_exists('data', $data)) {
+      ZLog::Write(LOGLEVEL_DEBUG, 'BackendOX::FilterContactFolders() personal_contactfolder: ' . print_r($data, true));
+      return $folder_list;
+    }
+    $contact_fid = $data['data'];
+    ZLog::Write(LOGLEVEL_DEBUG, 'BackendOX::FilterContactFolders() personal_contactfolder: ' . $contact_fid);
+
+    // Loop to skip all contact folders, except the personal one
+    $_folder_list = array();
+    foreach($folder_list as $folder) {
+      $folder_data = $this -> GetFolder($folder['id']);
+      if ($folder_data -> type != SYNC_FOLDER_TYPE_CONTACT or $folder['id'] == $contact_fid) {
+        ZLog::Write(LOGLEVEL_DEBUG, 'BackendOX::FilterContactFolders() type: ' . $folder_data -> type . ' id: ' . $folder['id']);
+        $_folder_list[] = $folder;
+      } else {
+        ZLog::Write(LOGLEVEL_DEBUG, 'BackendOX::FilterContactFolders() skipped: ' . $folder['id']);
+      }
+    }
+
+    return $_folder_list;
+  }
+
+  private function GetOXUserConfig($conf_path) {
+    // Retrieve user-specific configuration. http://oxpedia.org/wiki/index.php?title=HTTP_API#Module_.22config.22
+    $response = $this -> OXConnector -> OXreqGET(sprintf('/ajax/config/%s', $conf_path), array('session' => $this -> OXConnector -> getSession()));
+    if ($response) {
+      return $response;
+    } else {
+      return array();
+    }
   }
 
   private function GetSubFolders($id) {
